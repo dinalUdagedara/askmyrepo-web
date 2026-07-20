@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RAG-Over-Codebase",
+  title: "AskMyRepo",
   description: "Chat with any GitHub repo",
 };
 
