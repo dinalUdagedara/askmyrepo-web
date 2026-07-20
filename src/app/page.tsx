@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { Bot, GitFork, Loader2, Send, User } from "lucide-react";
+
 import {
   ApiError,
   chatWithRepo,
@@ -9,6 +11,19 @@ import {
   indexRepo,
   type Source,
 } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 
 interface IndexedRepo {
   repoId: string;
@@ -33,6 +48,12 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, chatLoading]);
 
   async function handleIndex(e: React.FormEvent) {
     e.preventDefault();
@@ -85,115 +106,171 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col flex-1 max-w-3xl w-full mx-auto p-6 gap-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">RAG-Over-Codebase</h1>
-        {repo && (
-          <button
-            onClick={reset}
-            className="text-sm text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
-          >
-            Index another repo
-          </button>
+    <div className="flex flex-1 flex-col items-center px-4 py-8">
+      <div className="flex w-full max-w-2xl flex-1 flex-col gap-4">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitFork className="size-5" />
+            <h1 className="text-lg font-semibold">AskMyRepo</h1>
+          </div>
+          {repo && (
+            <Button variant="ghost" size="sm" onClick={reset}>
+              Index another repo
+            </Button>
+          )}
+        </header>
+
+        {!repo && (
+          <div className="flex flex-1 items-center justify-center">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle>Chat with any GitHub repo</CardTitle>
+                <CardDescription>
+                  Paste a public repo URL and ask questions about the code, with
+                  answers cited to the exact file and line.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleIndex} className="flex gap-2">
+                  <Input
+                    type="text"
+                    required
+                    value={repoUrlInput}
+                    onChange={(e) => setRepoUrlInput(e.target.value)}
+                    placeholder="https://github.com/owner/repo"
+                  />
+                  <Button type="submit" disabled={indexing}>
+                    {indexing ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      "Index"
+                    )}
+                  </Button>
+                </form>
+                {indexError && (
+                  <p className="mt-2 text-sm text-destructive">{indexError}</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
-      </header>
 
-      {!repo && (
-        <form onSubmit={handleIndex} className="flex flex-col gap-3 mt-12">
-          <label className="text-sm text-neutral-500">
-            Paste a GitHub repo URL to chat with it
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              required
-              value={repoUrlInput}
-              onChange={(e) => setRepoUrlInput(e.target.value)}
-              placeholder="https://github.com/owner/repo"
-              className="flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-500"
-            />
-            <button
-              type="submit"
-              disabled={indexing}
-              className="rounded-md bg-neutral-900 dark:bg-neutral-100 text-neutral-50 dark:text-neutral-900 px-4 py-2 text-sm font-medium disabled:opacity-50"
-            >
-              {indexing ? "Indexing…" : "Index"}
-            </button>
-          </div>
-          {indexError && <p className="text-sm text-red-500">{indexError}</p>}
-        </form>
-      )}
+        {repo && (
+          <Card className="flex flex-1 flex-col overflow-hidden">
+            <CardHeader className="border-b pb-4">
+              <CardTitle className="text-base">{repo.name}</CardTitle>
+              <CardDescription>{repo.repoUrl}</CardDescription>
+            </CardHeader>
 
-      {repo && (
-        <>
-          <p className="text-sm text-neutral-500">
-            Chatting with <span className="font-medium">{repo.name}</span>
-          </p>
+            <ScrollArea className="flex-1 px-4">
+              <div className="flex flex-col gap-4 py-4">
+                {messages.map((message, i) => (
+                  <div
+                    key={i}
+                    className={
+                      message.role === "user"
+                        ? "flex items-start justify-end gap-2"
+                        : "flex items-start gap-2"
+                    }
+                  >
+                    {message.role === "assistant" && (
+                      <Avatar size="sm" className="mt-0.5">
+                        <AvatarFallback>
+                          <Bot className="size-3.5" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
 
-          <div className="flex-1 flex flex-col gap-4 overflow-y-auto">
-            {messages.map((message, i) => (
-              <div
-                key={i}
-                className={
-                  message.role === "user"
-                    ? "self-end max-w-[80%] rounded-lg bg-neutral-900 dark:bg-neutral-100 text-neutral-50 dark:text-neutral-900 px-4 py-2 text-sm"
-                    : "self-start max-w-[80%] rounded-lg bg-neutral-100 dark:bg-neutral-800 px-4 py-2 text-sm"
-                }
-              >
-                {message.role === "assistant" ? (
-                  <div className="markdown-content">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <div
+                      className={
+                        message.role === "user"
+                          ? "max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground"
+                          : "max-w-[80%] rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm"
+                      }
+                    >
+                      {message.role === "assistant" ? (
+                        <div className="markdown-content">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        message.content
+                      )}
+
+                      {message.sources && message.sources.length > 0 && (
+                        <>
+                          <Separator className="my-2" />
+                          <div className="flex flex-col gap-1">
+                            {message.sources.map((source, j) => {
+                              const url = githubLineUrl(
+                                repo.repoUrl,
+                                repo.commitSha,
+                                source
+                              );
+                              const label = `${source.file_path}:${source.start_line}-${source.end_line}`;
+                              return (
+                                <a
+                                  key={j}
+                                  href={url ?? "#"}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                >
+                                  [{j + 1}] {label}
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {message.role === "user" && (
+                      <Avatar size="sm" className="mt-0.5">
+                        <AvatarFallback>
+                          <User className="size-3.5" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                ) : (
-                  message.content
-                )}
-                {message.sources && message.sources.length > 0 && (
-                  <div className="mt-2 flex flex-col gap-1 border-t border-neutral-300 dark:border-neutral-700 pt-2">
-                    {message.sources.map((source, j) => {
-                      const url = githubLineUrl(repo.repoUrl, repo.commitSha, source);
-                      const label = `${source.file_path}:${source.start_line}-${source.end_line}`;
-                      return (
-                        <a
-                          key={j}
-                          href={url ?? "#"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          [{j + 1}] {label}
-                        </a>
-                      );
-                    })}
+                ))}
+
+                {chatLoading && (
+                  <div className="flex items-center gap-2">
+                    <Avatar size="sm">
+                      <AvatarFallback>
+                        <Bot className="size-3.5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Thinking…
+                    </div>
                   </div>
                 )}
+                <div ref={bottomRef} />
               </div>
-            ))}
-            {chatLoading && (
-              <div className="self-start text-sm text-neutral-500">Thinking…</div>
-            )}
-          </div>
+            </ScrollArea>
 
-          {chatError && <p className="text-sm text-red-500">{chatError}</p>}
-
-          <form onSubmit={handleAsk} className="flex gap-2">
-            <input
-              type="text"
-              required
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask a question about this repo…"
-              className="flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-500"
-            />
-            <button
-              type="submit"
-              disabled={chatLoading}
-              className="rounded-md bg-neutral-900 dark:bg-neutral-100 text-neutral-50 dark:text-neutral-900 px-4 py-2 text-sm font-medium disabled:opacity-50"
-            >
-              Ask
-            </button>
-          </form>
-        </>
-      )}
+            <CardFooter className="flex-col items-stretch gap-2 border-t pt-4">
+              {chatError && (
+                <p className="text-sm text-destructive">{chatError}</p>
+              )}
+              <form onSubmit={handleAsk} className="flex gap-2">
+                <Input
+                  type="text"
+                  required
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Ask a question about this repo…"
+                />
+                <Button type="submit" disabled={chatLoading} size="icon">
+                  <Send />
+                </Button>
+              </form>
+            </CardFooter>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
